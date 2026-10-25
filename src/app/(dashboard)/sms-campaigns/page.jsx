@@ -29,10 +29,27 @@ export default function SmsCampaignsPage() {
   };
 
   const handleSendSms = async (newLog) => {
-    // Optimistic UI Update
+    // 1. Optimistic UI Update
     setLogs((prev) => [{ ...newLog, id: `log-${Date.now()}` }, ...prev]);
-    // Persist to Supabase Database
+
+    // 2. Persist to Supabase Database
     await recordSmsLog(newLog);
+
+    // 3. Dispatch Live SMS via Twilio API Endpoint
+    try {
+      await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientName: newLog.recipientName,
+          phoneNumber: newLog.phoneNumber,
+          campaignName: newLog.campaignName,
+          message: `Hi ${newLog.recipientName}, thanks for choosing us! Please take 30 seconds to review your experience.`,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to trigger Twilio API route:', error);
+    }
   };
 
   return (
