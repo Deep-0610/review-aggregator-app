@@ -1,22 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
-import { MOCK_REVIEWS } from '@/lib/mockData';
+import React, { useState, useEffect } from 'react';
+import { fetchReviews, postReviewReply } from '@/lib/supabase/queries';
 import { ReviewCard } from '@/components/dashboard/ReviewCard';
 import { ReviewFilters } from '@/components/dashboard/ReviewFilters';
 
 export default function ReviewsPage() {
-  const [reviews, setReviews] = useState(MOCK_REVIEWS);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
 
-  const handleSendReply = (reviewId, text) => {
+  useEffect(() => {
+    async function loadReviews() {
+      setLoading(true);
+      const data = await fetchReviews();
+      setReviews(data);
+      setLoading(false);
+    }
+    loadReviews();
+  }, []);
+
+  const handleSendReply = async (reviewId, text) => {
+    // Optimistic UI Update
     setReviews((prev) =>
       prev.map((r) =>
         r.id === reviewId ? { ...r, status: 'replied', replyText: text } : r
       )
     );
+    // Persist to Supabase Database
+    await postReviewReply(reviewId, text);
   };
 
   const filteredReviews = reviews.filter((review) => {
@@ -51,17 +65,23 @@ export default function ReviewsPage() {
         setSelectedStatus={setSelectedStatus}
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {filteredReviews.length > 0 ? (
-          filteredReviews.map((review) => (
-            <ReviewCard key={review.id} review={review} onSendReply={handleSendReply} />
-          ))
-        ) : (
-          <div className="col-span-2 text-center py-12 bg-white rounded-xl border border-dashed text-slate-500">
-            No reviews match your current filters.
-          </div>
-        )}
-      </div>
+      {loading ? (
+        <div className="text-center py-12 text-slate-500 text-sm">
+          Loading live reviews...
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {filteredReviews.length > 0 ? (
+            filteredReviews.map((review) => (
+              <ReviewCard key={review.id} review={review} onSendReply={handleSendReply} />
+            ))
+          ) : (
+            <div className="col-span-2 text-center py-12 bg-white rounded-xl border border-dashed text-slate-500">
+              No reviews match your current filters.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

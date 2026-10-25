@@ -1,14 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
-import { MOCK_SMS_CAMPAIGNS, MOCK_SMS_LOGS } from '@/lib/mockSmsData';
+import React, { useState, useEffect } from 'react';
+import { MOCK_SMS_CAMPAIGNS } from '@/lib/mockSmsData';
+import { fetchSmsLogs, recordSmsLog } from '@/lib/supabase/queries';
 import { SmsTemplateCard } from '@/components/dashboard/SmsTemplateCard';
 import { SmsLogsTable } from '@/components/dashboard/SmsLogsTable';
 import { SendSmsModal } from '@/components/dashboard/SendSmsModal';
 
 export default function SmsCampaignsPage() {
   const [campaigns, setCampaigns] = useState(MOCK_SMS_CAMPAIGNS);
-  const [logs, setLogs] = useState(MOCK_SMS_LOGS);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadLogs() {
+      setLoading(true);
+      const data = await fetchSmsLogs();
+      setLogs(data);
+      setLoading(false);
+    }
+    loadLogs();
+  }, []);
 
   const handleSaveTemplate = (id, newTemplate) => {
     setCampaigns((prev) =>
@@ -16,8 +28,11 @@ export default function SmsCampaignsPage() {
     );
   };
 
-  const handleSendSms = (newLog) => {
+  const handleSendSms = async (newLog) => {
+    // Optimistic UI Update
     setLogs((prev) => [{ ...newLog, id: `log-${Date.now()}` }, ...prev]);
+    // Persist to Supabase Database
+    await recordSmsLog(newLog);
   };
 
   return (
@@ -47,7 +62,11 @@ export default function SmsCampaignsPage() {
 
       <div>
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Recent Outbound SMS Logs</h2>
-        <SmsLogsTable logs={logs} />
+        {loading ? (
+          <div className="text-center py-8 text-slate-500 text-sm">Loading logs...</div>
+        ) : (
+          <SmsLogsTable logs={logs} />
+        )}
       </div>
     </div>
   );
